@@ -1,15 +1,5 @@
-rm(list = ls())
-graphics.off()
-#setwd('/Users/bmsbm/Documents/BSU/MM')
-library(PReMiuM)
-library(data.table)
-library(RColorBrewer)
-library(mcclust)
-set.seed(2)
-
-
 generate_cluster_data <- function(nClusters = 3,
-                                  nCovariates = 5,
+                                  nCovariates = 15,
                                   probs_on = c(0.9,0.1),
                                   probs_off = c(0.1,0.9)){
   clusterData <- list()
@@ -47,28 +37,3 @@ clusSummaryBernoulliDiscrete_mine <- function(outcomeType = "Bernouilli",
                                                                              probs_on = probs_on,
                                                                              probs_off = probs_off)) 
 }
-
-### generate some data
-inputs <- generateSampleDataFile(clusSummaryBernoulliDiscrete_mine())
-
-myData <- inputs$inputData
-myDataInput <- myData[,tail(colnames(myData), 5)] # Remember to change this to nCovariates when the fxn is working
-
-#Visualise the data:
-pheatmap::pheatmap(myDataInput, 
-                   cluster_rows = F, 
-                   cluster_cols = F,
-                   col = c("white", "black"),
-                   #annotation_row = annot, 
-                   cellheight = 0.35, 
-                   show_rownames = F)
-
-
-### Apply Premium on generated data
-
-
-### **Goal**: generate some data, visualize it including the true cluster labels as an annotation.
-### Applying Premium on the generated data to see how it performs
-
-### Merge my notes and Paul's
-
