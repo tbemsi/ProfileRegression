@@ -1,98 +1,73 @@
 rm(list = ls())
 graphics.off()
-setwd('/Users/bmsbm/Documents/BSU/MM') 
+setwd('/Users/bmsbm/Documents/BSU/code') 
 library(PReMiuM)
 library(data.table)
 library(RColorBrewer)
 library(mcclust)
+library(mclust)
 library(gtools)
 set.seed(2)
 
 source('clusSummaryBernouilli_new.R')
 source('generate_psm.R')
 
-#-----------------------1. Setting cluster sizes manually -----------------------------------------------
-### generate some data
-nCovariates <- 5
-nClusters <- 3
-ClusterSizes <- c(300, 100, 100)
-inputs <- generateSampleDataFile(clusSummaryBernoulliDiscrete_mine(nCovariates = nCovariates,
-                                                                   nClusters = nClusters,
-                                                                   clusterSizes = ClusterSizes))
-cluster_labels <- generate_cluster_labels(ClusterSizes)
-annot <- data.frame(Group = as.factor(cluster_labels)) 
-rownames(annot) <- rownames(inputs$inputData) <- seq(1, nrow(inputs$inputData))
 
-### Visualise the data:
-pheatmap::pheatmap(inputs$inputData[,2:ncol(inputs$inputData)],  
-                   cluster_rows = F,
-                   cluster_cols = F,
-                   col = c("white", "black"),
-                   annotation_row = annot)
-
-
-### Apply Premium on generated data
-#generate_psm(inputs, filename = "psm_manual_weights")
-
-myOrder2 <- generate_psm(inputs, filename = "psm_manual_weights") # this is the order of the PSM
-
-
-### now I want to do a heatmap of the data with myOrder2
-sth <- inputs$inputData[myOrder2[1], ]
-for (i in 2:length(myOrder2)){
-  sth <- rbind(sth, inputs$inputData[myOrder2[i], ])
+simulation_dirichlet <- function(nClusters = 3,
+                                 nPatients = 1000,
+                                 nCovariates = 10,
+                                 alphaParameter = 1){
+  mixtureWeights <- rdirichlet(1, rep(alphaParameter,nClusters))
+  clusterSizes <- rmultinom(1, nPatients, mixtureWeights)  
+  inputs <- generateSampleDataFile(clusSummaryBernoulliDiscrete_mine(nCovariates = nCovariates,
+                                                                     nClusters = nClusters,
+                                                                     clusterSizes = clusterSizes))
+  
+  cluster_labels <- generate_cluster_labels(clusterSizes)
+  annot <- data.frame(Group = as.factor(cluster_labels)) 
+  rownames(annot) <- rownames(inputs$inputData) <- seq(1, nrow(inputs$inputData))
+  
+  ### Visualise the data:
+  pheatmap::pheatmap(inputs$inputData[,2:ncol(inputs$inputData)],  
+                     cluster_rows = F,
+                     cluster_cols = F,
+                     col = c("white", "black"),
+                     annotation_row = annot)
+  
+  
+  ### Apply Premium on generated data
+  #generate_psm(inputs)
+  
+  myOrder2 <- generate_psm(inputs, filename="psm_dirichlet.pdf") # this is the order of the PSM
+  
+  ### Do a heatmap of the data with myOrder2
+  sth <- inputs$inputData[myOrder2[1], ]
+  for (i in 2:length(myOrder2)){
+    sth <- rbind(sth, inputs$inputData[myOrder2[i], ])
+  }
+  ordered_df <- as.data.frame(sth)
+  
+  myPSMHeatmap <- pheatmap::pheatmap(ordered_df,  
+                                     cluster_rows = F,
+                                     cluster_cols = F,
+                                     col = c("white", "black"),
+                                     annotation_row = annot,
+                                     filename = "ordered_df_dirichlet.pdf")
+  
+  z <- fread("myOutput_unsupervised_z.txt", header = FALSE)
+  zMatrix <- as.matrix(z)
+  zMatrix <- zMatrix[ceiling(nrow(zMatrix)/2):nrow(zMatrix),]
+  #Thin the MCMC output by taking only every 500-th draw:
+  zMatrix <- zMatrix[seq(1, nrow(zMatrix), by=500),]
+  randy <- rep(0, nrow(zMatrix))
+  for (i in 1:nrow(zMatrix)){
+    randy[i] <- adjustedRandIndex(cluster_labels, zMatrix[i,])
+  }
+  jpeg(paste(nCovariates,"_rplot.jpg"))
+  boxplot(randy)
+  dev.off()
 }
-ordered_df <- as.data.frame(sth)
 
-myPSMHeatmap <- pheatmap::pheatmap(ordered_df,  
-                                   cluster_rows = F,
-                                   cluster_cols = F,
-                                   col = c("white", "black"),
-                                   annotation_row = annot,
-                                   filename = "ordered_df_manual_weights.pdf")
-
-
-#2. -------------------- Using dirichlet process to generate cluster weights -------------------
-nClusters <- 3
-nPatients <- 600
-alphaParameter <- 1
-mixtureWeights <- rdirichlet(1, rep(alphaParameter,nClusters))
-clusterSizes <- rmultinom(1, nPatients, mixtureWeights)  
-inputs <- generateSampleDataFile(clusSummaryBernoulliDiscrete_mine(nCovariates = nCovariates,
-                                                                   nClusters = nClusters,
-                                                                   clusterSizes = ClusterSizes))
-
-cluster_labels <- generate_cluster_labels(ClusterSizes)
-annot <- data.frame(Group = as.factor(cluster_labels)) 
-rownames(annot) <- rownames(inputs$inputData) <- seq(1, nrow(inputs$inputData))
-
-### Visualise the data:
-pheatmap::pheatmap(inputs$inputData[,2:ncol(inputs$inputData)],  
-                   cluster_rows = F,
-                   cluster_cols = F,
-                   col = c("white", "black"),
-                   annotation_row = annot)
-
-
-### Apply Premium on generated data
-#generate_psm(inputs)
-
-myOrder2 <- generate_psm(inputs, filename="psm_dirichlet") # this is the order of the PSM
-
-
-### now I want to do a heatmap of the data with myOrder2
-sth <- inputs$inputData[myOrder2[1], ]
-for (i in 2:length(myOrder2)){
-  sth <- rbind(sth, inputs$inputData[myOrder2[i], ])
-}
-ordered_df <- as.data.frame(sth)
-
-myPSMHeatmap <- pheatmap::pheatmap(ordered_df,  
-                                   cluster_rows = F,
-                                   cluster_cols = F,
-                                   col = c("white", "black"),
-                                   annotation_row = annot,
-                                   filename = "ordered_df_dirichlet.pdf")
 
 
 #3.----------------------- Traceplot of alpha parameter ----------------------------------------
@@ -105,6 +80,10 @@ plot(alphas, type ='l', ylab='alpha')
 # calculated Adjusted Rand Index (mcclust package) between final clustering and true clustering
 # distribution of ARIs - each row of z matrix and the ground truth - maybe boxplots?
 
+
+for (i in c(5, 10, 15, 20)){
+  simulation_dirichlet(nClusters = 3, nPatients = 1000, nCovariates = i, alphaParameter = 1)
+}
 
 
 
