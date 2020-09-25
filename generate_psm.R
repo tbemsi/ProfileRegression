@@ -6,7 +6,9 @@ generate_cluster_labels <- function(ClusterSizes){
   cluster_labels
 }
 
-generate_psm <- function(inputs, filename = 'psm.pdf'){
+generate_psm <- function(inputs, 
+                         filename = 'psm.pdf', 
+                         unsupervised=TRUE){
   runInfoObj <- profRegr(yModel = inputs$yModel,
                          xModel = inputs$xModel,
                          nSweeps = 100000,
@@ -16,7 +18,7 @@ generate_psm <- function(inputs, filename = 'psm.pdf'){
                          output="myOutput_unsupervised",
                          covNames = names(inputs$inputData[,2:ncol(inputs$inputData)]),
                          reportBurnIn = TRUE, 
-                         excludeY = TRUE)
+                         excludeY = unsupervised)
   
   # trace plot to decide how many iterations count as burn-in
   globalParsTrace(runInfoObj,
