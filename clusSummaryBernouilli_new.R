@@ -21,7 +21,7 @@ generate_cluster_data <- function(nClusters = 3,
   clusterData
 }
 
-clusSummaryBernoulliDiscrete_mine <- function(outcomeType = "Bernouilli",
+clusSummaryBernoulliDiscrete_mine <- function(outcomeType = "Bernoulli",
                                               covariateType = "Discrete",
                                               nCovariates = 5,
                                               nClusters = 3,
