@@ -1,0 +1,138 @@
+---
+title: "Large PSM clustering"
+author: "Paul DW Kirk"
+date: "02/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+rm(list = ls())
+
+generatePSM <- function(n, seed = 1)
+{
+  nSamplesCluster1 <- round(0.1*n)
+  nSamplesCluster2 <- round(0.2*n)
+  nSamplesCluster3 <- round(0.3*n)
+  nSamplesCluster4 <- n - (nSamplesCluster1 + nSamplesCluster2 + nSamplesCluster3)
+  
+  clusters <- c(rep(1,nSamplesCluster1), rep(2,nSamplesCluster2), 
+                rep(3,nSamplesCluster3), rep(4,nSamplesCluster4))
+  
+  pilotPSM <- matrix(0, nrow = n, ncol = n)
+  pilotPSM[1:nSamplesCluster1, 1:nSamplesCluster1]                   <- 1
+  pilotPSM[(nSamplesCluster1+1):(nSamplesCluster1+nSamplesCluster2),
+           (nSamplesCluster1+1):(nSamplesCluster1+nSamplesCluster2)] <- 1
+  pilotPSM[(nSamplesCluster1+nSamplesCluster2+1):
+             (nSamplesCluster1+nSamplesCluster2+nSamplesCluster3),
+           (nSamplesCluster1+nSamplesCluster2+1):
+             (nSamplesCluster1+nSamplesCluster2+nSamplesCluster3)]   <- 1
+  pilotPSM[(nSamplesCluster1+nSamplesCluster2+nSamplesCluster3+1):n,
+           (nSamplesCluster1+nSamplesCluster2+nSamplesCluster3+1):n] <- 1
+  
+  set.seed(seed)
+  noiseMatrix <- matrix(rbeta(n*n,0.1,2), nrow = n, ncol = n)
+  
+  pilotPSM    <- abs(pilotPSM - noiseMatrix)
+  newPSM      <- (pilotPSM + t(pilotPSM))/2
+  return(list(psm = newPSM, clusters = clusters))
+}
+
+n <- 1000
+psmResults   <- generatePSM(n)
+trueClusters <- psmResults$clusters
+psm1000      <- psmResults$psm
+
+
+#Make symmetric
+graphics.off()
+pheatmap::pheatmap(psm1000, cluster_rows = F, cluster_cols = F)
+hist(psm1000)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r cars}
+library("dbscan")
+
+myDist         <- as.dist(1 - psm1000)
+
+hdbscanResults <- hdbscan(myDist, minPts = round(0.05*n))
+
+plot(hdbscanResults) # A summary dendrogram, showing the relationships between the clusters
+
+# Generate annotations for rows and columns
+annotation_col = data.frame(
+  Cluster = factor(hdbscanResults$cluster+1L)
+)
+
+rownames(annotation_col) <- rownames(psm1000) <- 
+  colnames(psm1000) <- paste0("V", seq(1,n))
+
+pheatmap::pheatmap(psm1000, cluster_rows = F, cluster_cols = F, 
+                   annotation_col = annotation_col, 
+                   show_rownames = F, 
+                   show_colnames = F)
+
+print(mcclust::arandi(trueClusters, hdbscanResults$cluster))
+
+```
+
+```{r cars}
+library(tictoc)
+
+#rangeOfSampleSizes <- c(100, 500, 1000, 1500, 2500, 5000, 10000, 20000, 
+#                        50000, 1e5, 2e5, 5e5, 1e6, 5e6, 1e7, 1e8)
+
+rangeOfSampleSizes <- c(100, 500, 1000, 1500, 2500, 5000, 10000, 20000, 
+                        27000)
+
+nRepetitions  <- 1
+
+timingsMatrix <- ariMatrix <- matrix(nrow = length(rangeOfSampleSizes), 
+                                     ncol = nRepetitions) 
+
+for(i in 1:length(rangeOfSampleSizes))
+{
+  print(paste("i = ",  i))
+  for(j in 1:nRepetitions)
+  {
+    print(paste("j = ",  j))
+    
+    n                  <- rangeOfSampleSizes[i]
+    print(n)
+    psmResults         <- generatePSM(n)
+    trueClusters       <- psmResults$clusters
+    psm                <- psmResults$psm
+    
+    myDist             <- as.dist(1 - psm)
+    
+    tic()
+    hdbscanResults     <- hdbscan(myDist, minPts = round(0.05*n))
+    timed              <- toc(quiet = T)
+    timingsMatrix[i,j] <- timed$toc - timed$tic
+    
+    ariMatrix[i,j]     <- mcclust::arandi(trueClusters, hdbscanResults$cluster)
+
+    print(timingsMatrix[i,j])    
+    
+    
+  }
+  
+  
+}
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
