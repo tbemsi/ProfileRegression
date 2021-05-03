@@ -2,20 +2,23 @@
 title: "Large PSM clustering"
 author: "Paul DW Kirk"
 date: "02/05/2021"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Large PSM clustering
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+In order to get this Rmd file to run, I first changed the maximum memory available to R by following  the top answer given at: https://stackoverflow.com/questions/51295402/r-on-macos-error-vector-memory-exhausted-limit-reached
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+It would be worth checking to see if this (i.e. editing .Renviron) would fix the issue being encountered when using the maxpear function.  
 
-```{r cars}
+
+```{r generatePSM}
 rm(list = ls())
 
 generatePSM <- function(n, seed = 1)
@@ -59,11 +62,11 @@ pheatmap::pheatmap(psm1000, cluster_rows = F, cluster_cols = F)
 hist(psm1000)
 ```
 
-## Including Plots
+## Illustrate the use of HDBSCAN
 
-You can also embed plots, for example:
-
-```{r cars}
+We check to see how we can use HDBSCAN to perform clustering on the basis of the PSM.
+```{r hdbscan}
+library("ggplot2")
 library("dbscan")
 
 myDist         <- as.dist(1 - psm1000)
@@ -88,17 +91,17 @@ pheatmap::pheatmap(psm1000, cluster_rows = F, cluster_cols = F,
 print(mcclust::arandi(trueClusters, hdbscanResults$cluster))
 
 ```
+## Assess how HDBSCAN scales with increasing n
 
-```{r cars}
+```{r largePSMclustering}
 library(tictoc)
 
 #rangeOfSampleSizes <- c(100, 500, 1000, 1500, 2500, 5000, 10000, 20000, 
 #                        50000, 1e5, 2e5, 5e5, 1e6, 5e6, 1e7, 1e8)
 
-rangeOfSampleSizes <- c(100, 500, 1000, 1500, 2500, 5000, 10000, 20000, 
-                        27000)
+rangeOfSampleSizes <- c(100, 500, 1000, 1500, 2500, 5000, 10000, 27000)
 
-nRepetitions  <- 1
+nRepetitions  <- 5
 
 timingsMatrix <- ariMatrix <- matrix(nrow = length(rangeOfSampleSizes), 
                                      ncol = nRepetitions) 
@@ -133,6 +136,20 @@ for(i in 1:length(rangeOfSampleSizes))
   
 }
 
+timingsToPlot <- data.frame(n = rangeOfSampleSizes, meanTimes = rowMeans(timingsMatrix), lower = apply(timingsMatrix, 1, function(x) min(x)), upper = apply(timingsMatrix, 1, function(x) max(x)))
+
+arisToPlot <- data.frame(n = rangeOfSampleSizes, meanARIs = rowMeans(ariMatrix), lower = apply(ariMatrix, 1, function(x) min(x)), upper = apply(ariMatrix, 1, function(x) max(x)))
+
+
+pTimings <- ggplot(timingsToPlot, aes(n, meanTimes)) + geom_line() + geom_errorbar(aes(ymin = lower, ymax = upper), width = 2) 
+
+pARIs <- ggplot(arisToPlot, aes(n, meanARIs)) + geom_line() + geom_errorbar(aes(ymin = lower, ymax = upper), width = 2) 
+
+
+plot(pTimings)
+
+plot(pARIs)
+
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
